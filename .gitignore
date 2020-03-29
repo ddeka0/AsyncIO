@@ -1,0 +1,38 @@
+# cmake build files
+/cmake/build
+# Visual Studio Code artifacts
+.vscode/*
+.history/
+
+
+# Clion artifacts
+cmake-build-debug/
+
+
+# vim temp files
+.*.swp
+
+
+
+*.o
+
+# git patch files
+*.patch
+
+#cmake junk
+cscope.*
+TAGS
+tags
+
+# dont ignore gitignore
+!.gitignore
+
+
+# igore CMake artifects
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+build/
+bin/

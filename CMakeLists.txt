@@ -12,11 +12,11 @@ set(CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR}/build)
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin)
 
 add_executable(${PROJECT_NAME}
-    accept.cpp
+    test-uring.cpp
 )
 
 
-set(BASIC_LIBRARIES "-luring -pthread")
+set(BASIC_LIBRARIES "-luring")
 set(CMAKE_CXX_FLAGS "-std=c++20 -Wall -g -O2")
 
 

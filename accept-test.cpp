@@ -7,10 +7,9 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <assert.h>
-#include "liburing.h"
+#include <liburing.h>
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
   struct io_uring_sqe *sqe;
   struct io_uring_cqe *cqe;
   struct io_uring ring;

@@ -12,7 +12,7 @@ set(CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR}/build)
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin)
 
 add_executable(${PROJECT_NAME}
-    ./test/connect.cpp
+    ./test/timeout.cpp
 )
 
 

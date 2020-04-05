@@ -15,7 +15,7 @@
 #include <liburing.h>
 #include <syscall.h>
 
-#define TIMEOUT_MSEC	200
+#define TIMEOUT_MSEC	2000
 static int not_supported;
 static int no_modify;
 
@@ -536,7 +536,7 @@ static int test_multi_timeout(struct io_uring *ring)
 		fprintf(stderr, "%s: get sqe failed\n", __FUNCTION__);
 		goto err;
 	}
-	io_uring_prep_timeout(sqe, &ts[0], 1, 0);
+	io_uring_prep_timeout(sqe, &ts[0], 2, 0);
 	sqe->user_data = 1;
 
 	/* req_2: timeout req, count = 1, time = TIMEOUT_MSEC */
@@ -547,7 +547,7 @@ static int test_multi_timeout(struct io_uring *ring)
 		fprintf(stderr, "%s: get sqe failed\n", __FUNCTION__);
 		goto err;
 	}
-	io_uring_prep_timeout(sqe, &ts[1], 1, 0);
+	io_uring_prep_timeout(sqe, &ts[1], 0, 0);
 	sqe->user_data = 2;
 
 	ret = io_uring_submit(ring);
@@ -591,13 +591,16 @@ static int test_multi_timeout(struct io_uring *ring)
 			fprintf(stderr, "%s: Req %d timeout: %s\n",
 				__FUNCTION__, i+1, strerror(cqe->res));
 			goto err;
-		}
+		} else {
+            std::cout <<"timer expired : "<<user_data << std::endl;
+        }
 		exp = mtime_since_now(&tv);
 		if (exp < time / 2 || exp > (time * 3) / 2) {
 			fprintf(stderr, "%s: Req %d timeout seems wonky (got %llu)\n",
 				__FUNCTION__, i+1, exp);
 			goto err;
 		}
+        std::cout << exp << std::endl;
 		io_uring_cqe_seen(ring, cqe);
 	}
 
@@ -978,13 +981,13 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	ret = test_single_timeout(&ring);
-	if (ret) {
-		fprintf(stderr, "test_single_timeout failed\n");
-		return ret;
-	}
-	if (not_supported)
-		return 0;
+	// ret = test_single_timeout(&ring);
+	// if (ret) {
+	// 	fprintf(stderr, "test_single_timeout failed\n");
+	// 	return ret;
+	// }
+	// if (not_supported)
+	// 	return 0;
 
 	ret = test_multi_timeout(&ring);
 	if (ret) {

@@ -34,30 +34,31 @@ private:
 class StateMgmtIntf {
 public:
     virtual void Proceed() = 0;
+	virtual ~StateMgmtIntf(){};
 };
 
 template< typename InitPrepFunc, typename InvokerFunc>
 class StateMgmt : public StateMgmtIntf {
 public:
-    explicit StateMgmt(struct io_uring *ring, int op,
-            int fd, __u32 len, __u64 off, AsyncServer * _server, 
+    explicit StateMgmt(struct io_uring *ring,int fd,
+			AsyncServer * _server, 
             InitPrepFunc& initPrepfunc, InvokerFunc & invokerfunc)
-		:ring_(ring), op_(op), fd_(fd), len_(len), off_(off),
+		:ring_(ring),fd_(fd),
 		status_(CREATE),
 		m_server(_server),  
-		initPrepfunc_(initAsyncReqfunc),
-		invokerfunc_(invokerRpcfunc) {
+		initPrepfunc_(initPrepfunc),
+		invokerfunc_(invokerfunc) {
 		Proceed();
 	}
+	virtual ~StateMgmt() {}
 	void Proceed() {
 		switch (status_) {
 			case CREATE: {
 				status_ = PROCESS;
-                struct io_uring_sqe *sqe_;
-                sqe_ = io_uring_get_sqe(ring_);
-
-				initPrepfunc_(op_,sqe_,fd_,addr_,len_,off_);
-				int ret = io_uring_submit(ring_);
+                this->sqe_ = io_uring_get_sqe(ring_);
+				initPrepfunc_(sqe_,fd_,buf,1024);
+				sqe_->user_data = (__u64)(this);
+				int ret = io_uring_submit(this->ring_);
 				if (ret <= 0) {
 					fprintf(stderr, "%s: sqe submit failed: %d\n", __FUNCTION__, ret);
 				}
@@ -65,15 +66,21 @@ public:
 			break;
 			case PROCESS: {
 
-				new StateMgmt<InitPrepFunc,InvokerFunc>(
-                    cqe_, ring_,op_, fd_,len_,off_,addr_,
-                    initPrepfunc_,invokerfunc_);
+				new StateMgmt<InitPrepFunc,InvokerFunc>
+				(
+                    ring_,
+					fd_,
+					m_server,
+                    initPrepfunc_,
+					invokerfunc_
+				);
 				
-				response_ =  invokerfunc_(request_);
+				invokerfunc_(buf);
 
 				status_ = FINISH;
-
+				
                 // TODO respond logic
+				this->Proceed(); // fix later
 			}
 			break;
 			case FINISH: {
@@ -87,14 +94,15 @@ public:
 	}
 private:
     struct io_uring *ring_;
-    int op_;
     int fd_;
-    __u32 len_;
-    __u64 off_;
+	enum CallStatus { CREATE, PROCESS, FINISH };
+	CallStatus status_;
+	
+	AsyncServer * m_server;
 	InitPrepFunc initPrepfunc_;
 	InvokerFunc invokerfunc_;
 
-	enum CallStatus { CREATE, PROCESS, FINISH };
-	CallStatus status_;
-	AsyncServer * m_server;
+	char buf[1024];
+	struct io_uring_sqe *sqe_;
+    int op_;
 };

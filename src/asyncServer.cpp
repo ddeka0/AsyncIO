@@ -1,4 +1,4 @@
-#include "asychServer.hpp"
+#include "asyncServer.hpp"
 
 #define PORT	10200
 #define HOST	"127.0.0.1"
@@ -8,7 +8,7 @@ AsyncServer::AsyncServer() {
 }
 
 AsyncServer::~AsyncServer() {
-    io_uring_queue_exit(ring_.get());
+    io_uring_queue_exit(ring_);
 };
 
 // we need to call this Run() method from ecterna module
@@ -30,28 +30,28 @@ void AsyncServer::Run() {
         return;
 	}
     this->sockfd = sockfd_;
+	// create a new ring
     this->ring_ = new io_uring();
-    std::cout <<"UDP server socket created " << sockfd_ << std::endl;
+	assert(io_uring_queue_init(32, this->ring_, 0) >= 0);
+    std::cout <<"UDP server socket created " << std::endl;
     HandleRequest();
 }
 
 void AsyncServer::InitiateRequest() {
 
 	auto initAsyncReq_READV = [this](struct io_uring_sqe* sqe,int fd,
-        struct iovec* iovecs) {
-		io_uring_prep_rw(IORING_OP_READV, sqe, fd, iovecs, 1, 0);
+    	void *buf,unsigned int len) {
+		io_uring_prep_rw(IORING_OP_RECV, sqe, fd, buf, len, 0);
 	};
-	auto invoker_PrintMsg = [this](struct iovec* iov) {
-
+	auto invoker_PrintMsg = [this](void *buf) {
+		std::string x((char *)buf,30);
+		std::cout <<"client data : " << x << std::endl;
 		return true;
 	};
 	new StateMgmt<decltype(initAsyncReq_READV),decltype(invoker_PrintMsg)>
 	(
         this->ring_,
-        (int)IORING_OP_READV,
         this->sockfd,
-        (__u32)1,
-        (__u64)0,
         this,
         initAsyncReq_READV,
         invoker_PrintMsg
@@ -60,5 +60,17 @@ void AsyncServer::InitiateRequest() {
 
 void AsyncServer::HandleRequest() {
 	InitiateRequest();
-    // TODO LOOP
+    // LOOP
+	while(true) {
+		struct io_uring_cqe *cqe;
+		io_uring_wait_cqe(ring_, &cqe);
+		if (cqe->res == -EINVAL) {
+			fprintf(stdout, "recv not supported, skipping\n");
+		}
+		if (cqe->res < 0) {
+			fprintf(stderr, "failed cqe: %d\n", cqe->res);
+		}
+		((StateMgmtIntf*)(cqe->user_data))->Proceed();
+		io_uring_cqe_seen(ring_, cqe);
+	}
 }

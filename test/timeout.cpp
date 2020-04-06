@@ -259,6 +259,7 @@ static int test_single_timeout(struct io_uring *ring)
 		fprintf(stderr, "%s: sqe submit failed: %d\n", __FUNCTION__, ret);
 		goto err;
 	}
+    
 
 	gettimeofday(&tv, NULL);
 	ret = io_uring_wait_cqe(ring, &cqe);

@@ -25,28 +25,24 @@ protected:
 private:
 	void HandleRequest();
 	void InitiateRequest();
-	std::unique_ptr<io_uring_cqe> cq_;
+	struct io_uring *ring_;
+	int sockfd;
 };
 
 
 
-class RpcStateMgmtIntf {
+class StateMgmtIntf {
 public:
     virtual void Proceed() = 0;
 };
 
-template<
-        class Service, 
-        class Request, 
-        class Reply,  
-        typename InitPrepFunc, 
-        typename InvokerFunc>
-class StateMgmt : public RpcStateMgmtIntf {
+template< typename InitPrepFunc, typename InvokerFunc>
+class StateMgmt : public StateMgmtIntf {
 public:
-    explicit StateMgmt(struct io_uring_cqe* cq,
-			AsyncServer * _server, InitPrepFunc& initPrepfunc, 
-			InvokerFunc & invokerfunc)
-		: cq_(cq), 
+    explicit StateMgmt(struct io_uring *ring, int op,
+            int fd, __u32 len, __u64 off, AsyncServer * _server, 
+            InitPrepFunc& initPrepfunc, InvokerFunc & invokerfunc)
+		:ring_(ring), op_(op), fd_(fd), len_(len), off_(off),
 		status_(CREATE),
 		m_server(_server),  
 		initPrepfunc_(initAsyncReqfunc),
@@ -57,14 +53,21 @@ public:
 		switch (status_) {
 			case CREATE: {
 				status_ = PROCESS;
-				initPrepfunc_(/* TODO */);
+                struct io_uring_sqe *sqe_;
+                sqe_ = io_uring_get_sqe(ring_);
+
+				initPrepfunc_(op_,sqe_,fd_,addr_,len_,off_);
+				int ret = io_uring_submit(ring_);
+				if (ret <= 0) {
+					fprintf(stderr, "%s: sqe submit failed: %d\n", __FUNCTION__, ret);
+				}
 			}
 			break;
 			case PROCESS: {
 
-				new RpcStateMgmt<Service,Request,Reply,InitAsyncReqFunc,
-				InvokerRpcFunc>
-				(cq_, m_server,initPrepfunc, invokerfunc);
+				new StateMgmt<InitPrepFunc,InvokerFunc>(
+                    cqe_, ring_,op_, fd_,len_,off_,addr_,
+                    initPrepfunc_,invokerfunc_);
 				
 				response_ =  invokerfunc_(request_);
 
@@ -83,8 +86,11 @@ public:
 		}
 	}
 private:
-    struct io_uring_cqe *cq_;
-
+    struct io_uring *ring_;
+    int op_;
+    int fd_;
+    __u32 len_;
+    __u64 off_;
 	InitPrepFunc initPrepfunc_;
 	InvokerFunc invokerfunc_;
 

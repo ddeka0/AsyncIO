@@ -32,6 +32,12 @@ After cloning this repository, please create a dummy file to run the sample test
     
     4. g++-10 -std=c++20 test-client.cpp
     5. ./a.out (client starts)
+    
+#### TODO for socket server features:
+    Currently Socket server only supports UDP socket server
+    1. Add TCP,SCTP support
+    2. Add timer support
+    3. Add a task system to parallelize the processing of the client requests.
 
 #### For few Test cases, your linux kernel might need to be updated.
     Follow the steps to update your kernel (replace kernel version with latest once)

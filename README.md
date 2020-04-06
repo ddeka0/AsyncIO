@@ -1,7 +1,7 @@
 # io_uring_cpp
 Test io_uring using liburing library
 
-### IO Uring Diagram
+### IO Uring Diagram (image source : https://cor3ntin.github.io/posts/iouring/)
 ![io_uring](https://cor3ntin.github.io/posts/iouring/uring.svg)
 
 ##### Installation procedure for liburing library

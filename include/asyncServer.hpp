@@ -33,16 +33,16 @@ private:
 
 class StateMgmtIntf {
 public:
-    virtual void Proceed() = 0;
+	virtual void Proceed() = 0;
 	virtual ~StateMgmtIntf(){};
 };
 
 template< typename InitPrepFunc, typename InvokerFunc>
 class StateMgmt : public StateMgmtIntf {
 public:
-    explicit StateMgmt(struct io_uring *ring,int fd,
+	explicit StateMgmt(struct io_uring *ring,int fd,
 			AsyncServer * _server, 
-            InitPrepFunc& initPrepfunc, InvokerFunc & invokerfunc)
+			InitPrepFunc& initPrepfunc, InvokerFunc & invokerfunc)
 		:ring_(ring),fd_(fd),
 		status_(CREATE),
 		m_server(_server),  
@@ -55,7 +55,7 @@ public:
 		switch (status_) {
 			case CREATE: {
 				status_ = PROCESS;
-                this->sqe_ = io_uring_get_sqe(ring_);
+				this->sqe_ = io_uring_get_sqe(ring_);
 				initPrepfunc_(sqe_,fd_,buf,1024);
 				sqe_->user_data = (__u64)(this);
 				int ret = io_uring_submit(this->ring_);
@@ -68,10 +68,10 @@ public:
 
 				new StateMgmt<InitPrepFunc,InvokerFunc>
 				(
-                    ring_,
+					ring_,
 					fd_,
 					m_server,
-                    initPrepfunc_,
+					initPrepfunc_,
 					invokerfunc_
 				);
 				
@@ -79,7 +79,7 @@ public:
 
 				status_ = FINISH;
 				
-                // TODO respond logic
+				// TODO respond logic
 				this->Proceed(); // fix later
 			}
 			break;
@@ -93,8 +93,8 @@ public:
 		}
 	}
 private:
-    struct io_uring *ring_;
-    int fd_;
+	struct io_uring *ring_;
+	int fd_;
 	enum CallStatus { CREATE, PROCESS, FINISH };
 	CallStatus status_;
 	
@@ -104,5 +104,5 @@ private:
 
 	char buf[1024];
 	struct io_uring_sqe *sqe_;
-    int op_;
+	int op_;
 };

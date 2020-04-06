@@ -13,12 +13,22 @@ Test io_uring using liburing library
     6. sudo make install    (or sudo checkinstall, helpfull for removing make install packages)
 
 ##### Sample Test
+
 After cloning this repository, please create a dummy file to run the sample test program:
 (`dd if=/dev/zero of=1GB.txt count=16 bs=64M`)
-
+(please change the cmake target cpp files for your required test)
+    
     1. cmake .
     2. make
-    2. ./build/bin/liburing-test 1GB.txt
+    3. ./build/bin/liburing-test 1GB.txt
+    
+##### Socket Server Test
+    1. cmake .
+    2. make
+    3. ./build/bin/liburing-test  (server is running)
+    
+    4. g++-10 -std=c++20 test-client.cpp
+    5. ./a.out (client starts)
 
 #### For few Test cases, your linux kernel might need to be updated.
     Follow the steps to update your kernel (replace kernel version with latest once)

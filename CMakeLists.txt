@@ -11,8 +11,11 @@ message(STATUS "Project Directory: ${PROJECT_SOURCE_DIR}")
 set(CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR}/build)
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin)
 
+include_directories(./include/)
+
 add_executable(${PROJECT_NAME}
-    ./test/timeout.cpp
+    ./test/main.cpp
+    ./src/asyncServer.cpp
 )
 
 

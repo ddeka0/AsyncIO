@@ -16,17 +16,27 @@
 #include <liburing.h>
 
 using namespace std;
+enum ServerSocketType_e {
+	SOCK_UDP = SOCK_DGRAM,
+	SOCK_TCP = SOCK_STREAM,
+	SOCK_SCTP = SOCK_STREAM,
+	SOCK_MAX
+};
+
 class AsyncServer {
 public:
 	AsyncServer();
 	~AsyncServer();
 	void Run();
+	void setServerConfig(ServerSocketType_e _type);
 protected:
 private:
 	void HandleRequest();
 	void InitiateRequest();
 	struct io_uring *ring_;
 	int sockfd;
+	
+	ServerSocketType_e server_type;
 };
 
 

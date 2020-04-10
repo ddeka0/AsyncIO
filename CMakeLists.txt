@@ -20,7 +20,7 @@ add_executable(${PROJECT_NAME}
 
 
 set(BASIC_LIBRARIES "-luring -pthread")
-set(CMAKE_CXX_FLAGS "-std=c++20 -Wall -g -O2")
+set(CMAKE_CXX_FLAGS "-std=c++20 -Wall -ggdb -O2 -fsanitize=address -fno-omit-frame-pointer")
 
 
 

@@ -16,85 +16,104 @@
 #include <liburing.h>
 
 using namespace std;
-enum ServerSocketType_e {
-	SOCK_UDP = SOCK_DGRAM,
-	SOCK_TCP = SOCK_STREAM,
-	SOCK_SCTP = SOCK_STREAM,
-	SOCK_MAX
-};
+
+#define SOCK_UDP		1 << 0
+#define SOCK_TCP		1 << 1
+#define SOCK_SCTP		1 << 2
+
+#define _UDP_IDX		0
+#define _TCP_IDX		1
+#define _SCTP_IDX		2
+
+#define READ_BUF_SIZE	1024
 
 class AsyncServer {
 public:
 	AsyncServer();
 	~AsyncServer();
 	void Run();
-	void setServerConfig(ServerSocketType_e _type);
+	void setServerConfig(uint8_t _types);
+	int sockfd_udp = -1;
+	int sockfd_tcp = -1;
+	int sockfd_sctp = -1;
+	uint8_t server_type;
+	std::mutex mtx;
+	struct io_uring *ring_;
 protected:
 private:
 	void HandleRequest();
 	void InitiateRequest();
-	struct io_uring *ring_;
-	int sockfd;
-	
-	ServerSocketType_e server_type;
 };
 
 
 
 class StateMgmtIntf {
 public:
-	virtual void Proceed() = 0;
+	virtual void Proceed(io_uring_cqe *cqe = nullptr) = 0;
 	virtual ~StateMgmtIntf(){};
+
+	// the following functions are required for
+	// polymorphism to work only
+	// because I cant take base class of StateMgmt and cast
+	// because of template
+	virtual void* getBuffer() = 0;
+	virtual int getReadFd() = 0;
+	virtual int getAcceptFd() = 0;
 };
 
-template< typename InitPrepFunc, typename InvokerFunc>
+template< typename InitPrepFunc, typename HandlerFunc>
 class StateMgmt : public StateMgmtIntf {
 public:
-	explicit StateMgmt(struct io_uring *ring,int fd,
+	explicit StateMgmt(struct io_uring *ring,int read_fd,int accept_fd,
 			AsyncServer * _server, 
-			InitPrepFunc& initPrepfunc, InvokerFunc & invokerfunc)
-		:ring_(ring),fd_(fd),
+			InitPrepFunc& initPrepFunc, HandlerFunc & handlerFunc,bool isClient = false)
+		:ring_(ring),
+		sockfd_read(read_fd),
+		sockfd_accept(accept_fd),
 		status_(CREATE),
+		isClientFd(isClient),
 		m_server(_server),  
-		initPrepfunc_(initPrepfunc),
-		invokerfunc_(invokerfunc) {
+		initPrepfunc_(initPrepFunc),
+		handlerfunc_(handlerFunc) {
+		std::cout <<"StateMgmt constructor called" << std::endl;
 		Proceed();
 	}
-	virtual ~StateMgmt() {}
-	void Proceed() {
+	virtual ~StateMgmt() {
+		std::cout <<this<<" destructed"<<std::endl;
+	}
+	void Proceed(io_uring_cqe *cqe = nullptr) {
 		switch (status_) {
 			case CREATE: {
 				status_ = PROCESS;
-				this->sqe_ = io_uring_get_sqe(ring_);
-				initPrepfunc_(sqe_,fd_,buf,1024);
-				sqe_->user_data = (__u64)(this);
-				int ret = io_uring_submit(this->ring_);
-				if (ret <= 0) {
-					fprintf(stderr, "%s: sqe submit failed: %d\n", __FUNCTION__, ret);
-				}
+				initPrepfunc_(this);
 			}
 			break;
 			case PROCESS: {
-
-				new StateMgmt<InitPrepFunc,InvokerFunc>
+				// Createa a new instance before current instance goes away
+				if(!isClientFd)
+				new StateMgmt<InitPrepFunc,HandlerFunc>
 				(
 					ring_,
-					fd_,
+					sockfd_read,
+					sockfd_accept,
 					m_server,
 					initPrepfunc_,
-					invokerfunc_
+					handlerfunc_,
+					isClientFd?true:false
 				);
 				
-				invokerfunc_(buf);
+				handlerfunc_(this,cqe);
 
 				status_ = FINISH;
 				
 				// TODO respond logic
-				this->Proceed(); // fix later
+				this->Proceed(cqe); // fix later
 			}
 			break;
 			case FINISH: {
 				assert(status_ == FINISH);
+				if(isClientFd)
+					close(this->sockfd_read);
 				delete this;
 			}
 			break;
@@ -102,17 +121,23 @@ public:
 				break;
 		}
 	}
+	void* getBuffer() {
+		return (void*)buf;
+	}
+	int getReadFd() {return sockfd_read; }
+	int getAcceptFd() { return sockfd_accept; }
 private:
 	struct io_uring *ring_;
-	int fd_;
+	int sockfd_read; 			// only one is needed
+	int sockfd_accept; 			// only one is needed
 	enum CallStatus { CREATE, PROCESS, FINISH };
 	CallStatus status_;
-	
+	bool isClientFd = false;
 	AsyncServer * m_server;
 	InitPrepFunc initPrepfunc_;
-	InvokerFunc invokerfunc_;
+	HandlerFunc handlerfunc_;
 
-	char buf[1024];
+	char buf[READ_BUF_SIZE];
 	struct io_uring_sqe *sqe_;
 	int op_;
 };

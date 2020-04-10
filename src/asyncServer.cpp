@@ -11,7 +11,7 @@ AsyncServer::AsyncServer() {
 }
 
 AsyncServer::~AsyncServer() {
-	std::cout <<"AsyncServer desctructed" << std::endl;
+	// std::cout <<"AsyncServer desctructed" << std::endl;
 	// io_uring_queue_exit(ring_);
 };
 
@@ -49,7 +49,7 @@ void AsyncServer::Run() {
 		sockfd_sctp = socket(AF_INET, SOCK_STREAM, IPPROTO_SCTP);
 	}
 	
-	if (sockfd_tcp < 0 || sockfd_udp < 0 || sockfd_sctp < 0) {
+	if (sockfd_tcp < 0 && sockfd_udp < 0 && sockfd_sctp < 0) {
 		perror("socket");
 		// return;
 	}
@@ -107,10 +107,10 @@ void AsyncServer::Run() {
 void AsyncServer::InitiateRequest() {
 	/******* prepare and define the handler functions for read operation ******/
 	auto prep_RECV = [this](StateMgmtIntf* instance) {
-		std::cout << __FUNCTION__ <<" called prep_RECV"<< std::endl;
-		//std::lock_guard<std::mutex> lock(mtx);
-		std::cout <<"> this : "<<this << std::endl;
-		std::cout <<"> this ring : "<<this->ring_ << std::endl;
+		// std::cout << __FUNCTION__ <<" called prep_RECV"<< std::endl;
+		// std::lock_guard<std::mutex> lock(mtx);
+		// std::cout <<"> this : "<<this << std::endl;
+		// std::cout <<"> this ring : "<<this->ring_ << std::endl;
 		auto sqe = io_uring_get_sqe(this->ring_);
 		io_uring_prep_rw(IORING_OP_RECV, sqe,instance->getReadFd(), 
 						instance->getBuffer(), READ_BUF_SIZE, 0);
@@ -121,8 +121,8 @@ void AsyncServer::InitiateRequest() {
 		}
 	};
 	auto handle_CQE_PrintMsg = [this](StateMgmtIntf* instance,io_uring_cqe *cqe) {
-		std::cout << __FUNCTION__ <<" called handle_CQE_PrintMsg"<< std::endl;
-		std::cout <<"Number of bytes read : " << cqe->res << std::endl;
+		//std::cout << __FUNCTION__ <<" called handle_CQE_PrintMsg"<< std::endl;
+		// std::cout <<"Number of bytes read : " << cqe->res << std::endl;
 		std::string x((char*)(instance->getBuffer()),cqe->res/*TODO replace with ??*/);
 		std::cout <<"Client data : " << x << std::endl;
 		return true;
@@ -140,10 +140,10 @@ void AsyncServer::InitiateRequest() {
 
 	/***** prepare and define the handler functions for accept Operation ******/
 	auto prep_ACCEPT = [this](StateMgmtIntf* instance) {
-		std::cout << __FUNCTION__ <<" called prep_ACCEPT"<< std::endl;
+		// std::cout << __FUNCTION__ <<" called prep_ACCEPT"<< std::endl;
 		//std::lock_guard<std::mutex> lock(mtx);
-		std::cout <<"# this : "<<this << std::endl;
-		std::cout <<"# this ring : "<<this->ring_ << std::endl;
+		// std::cout <<"# this : "<<this << std::endl;
+		// std::cout <<"# this ring : "<<this->ring_ << std::endl;
 		auto sqe = io_uring_get_sqe(this->ring_);
 		io_uring_prep_rw(IORING_OP_ACCEPT, sqe, this->sockfd_tcp, NULL, 0, 0);
 		sqe->user_data = (__u64)(instance); // important
@@ -152,9 +152,9 @@ void AsyncServer::InitiateRequest() {
 			fprintf(stderr, "%s: sqe submit failed: %d\n", __FUNCTION__, ret);
 		}
 	};
-	auto handle_CQE_AcceptHandle = [this,/*reuser params,*/ prep_RECV,handle_CQE_PrintMsg]
+	auto handle_CQE_AcceptHandle = [this,prep_RECV,handle_CQE_PrintMsg]
 		(StateMgmtIntf* instance,io_uring_cqe *cqe) mutable {
-		std::cout << __FUNCTION__ <<" called handle_CQE_AcceptHandle"<< std::endl;
+		// std::cout << __FUNCTION__ <<" called handle_CQE_AcceptHandle"<< std::endl;
 		
 		// std::lock_guard<std::mutex> lock{mtx};
 		// we have to create a new instance for read operation on this new client fd
@@ -222,7 +222,7 @@ void AsyncServer::HandleRequest() {
 			else 
 				std::cerr <<"Error in the cqe!" << std::endl;
 		}
-		std::cout <<"One cqe done! flags : "<<cqe->flags << std::endl;
+		// std::cout <<"One cqe done! flags : "<<cqe->flags << std::endl;
 		io_uring_cqe_seen(ring_, cqe);
 	}
 }

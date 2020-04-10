@@ -75,11 +75,11 @@ public:
 		m_server(_server),  
 		initPrepfunc_(initPrepFunc),
 		handlerfunc_(handlerFunc) {
-		std::cout <<"StateMgmt constructor called" << std::endl;
+		// std::cout <<"StateMgmt constructor called" << std::endl;
 		Proceed();
 	}
 	virtual ~StateMgmt() {
-		std::cout <<this<<" destructed"<<std::endl;
+		// std::cout <<this<<" destructed"<<std::endl;
 	}
 	void Proceed(io_uring_cqe *cqe = nullptr) {
 		switch (status_) {

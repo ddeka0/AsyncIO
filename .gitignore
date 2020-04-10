@@ -15,7 +15,7 @@ cmake-build-debug/
 
 
 *.o
-
+*.out
 # git patch files
 *.patch
 

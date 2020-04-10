@@ -10,7 +10,7 @@
 #include <pthread.h>
 using namespace std;
 
-#define PORT	10200
+#define PORT	10201
 #define HOST	"127.0.0.1"
 
 int main() {
@@ -22,21 +22,20 @@ int main() {
 	saddr.sin_port = htons(PORT);
 	inet_pton(AF_INET, HOST, &saddr.sin_addr);
 
-	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd < 0) {
 		perror("socket");
 		return 1;
 	}
     
-    char str[] = "Hello IO_URING";
-    // ret = connect(sockfd, (const sockaddr*)&saddr, sizeof(saddr));
-	// if (ret < 0) {
-	// 	perror("connect");
-	// 	return 1;
-	// }
-    // send(sockfd,str,strlen(str),0);
-    sendto(sockfd, str, strlen(str), 
-        MSG_CONFIRM, (const struct sockaddr *) &saddr,  
-            sizeof(saddr)); 
-    getchar();
+    char str[] = "Hello IO_URING(TCP)";
+    ret = connect(sockfd, (const sockaddr*)&saddr, sizeof(saddr));
+	if (ret < 0) {
+		perror("connect");
+		return 1;
+	}
+    auto n = send(sockfd,str,strlen(str),0);
+    std::cout << n << " bytes sent to server" << std::endl;
+    close(sockfd);
+    // getchar();
 }

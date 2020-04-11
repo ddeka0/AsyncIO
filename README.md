@@ -33,6 +33,7 @@ After cloning this repository, please create a dummy file to run the sample test
     
     4. g++-10 -std=c++20 udp_client.cpp && ./a.out
     5. g++-10 -std=c++20 tcp_client.cpp && ./a.out
+![TCP_UDP_server_running](demo.gif)
     
 #### TODO for socket server features:
     Currently Socket server only supports UDP socket server

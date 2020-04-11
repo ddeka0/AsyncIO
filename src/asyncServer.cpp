@@ -124,12 +124,16 @@ void AsyncServer::InitiateRequest() {
 			fprintf(stderr, "%s: sqe submit failed: %d\n", __FUNCTION__, ret);
 		}
 	};
-	auto handle_CQE_PrintMsg = [this](StateMgmtIntf* instance,io_uring_cqe *cqe) {
+	auto handle_CQE_PrintMsg = [](StateMgmtIntf* instance,io_uring_cqe *cqe) {
 		//std::cout << __FUNCTION__ <<" called handle_CQE_PrintMsg"<< std::endl;
 		// std::cout <<"Number of bytes read : " << cqe->res << std::endl;
 		// std::string x((char*)(instance->getBuffer()),cqe->res/*TODO replace with ??*/);
 		// std::cout <<"Client data : " << x << std::endl;
-		callback[0](instance->getBuffer(),cqe->res);
+		if(callback[0] != nullptr) {
+			callback[0](instance->getBuffer(),cqe->res,instance->getClientInfo());
+		}
+		else 
+			std::cerr << "callback not registered" << std::endl;
 		return true;
 	};
 	new StateMgmt<decltype(prep_RECV),decltype(handle_CQE_PrintMsg)>
@@ -150,7 +154,8 @@ void AsyncServer::InitiateRequest() {
 		// std::cout <<"# this : "<<this << std::endl;
 		// std::cout <<"# this ring : "<<this->ring_ << std::endl;
 		auto sqe = io_uring_get_sqe(this->ring_);
-		io_uring_prep_rw(IORING_OP_ACCEPT, sqe, this->sockfd_tcp, NULL, 0, 0);
+		int len = sizeof(sockaddr_in);
+		io_uring_prep_rw(IORING_OP_ACCEPT, sqe, this->sockfd_tcp, instance->getClientSockAddr(), 0, (__u64)(unsigned long)(&len));
 		sqe->user_data = (__u64)(instance); // important
 		auto ret = io_uring_submit(this->ring_);
 		if (ret <= 0) {
@@ -159,33 +164,14 @@ void AsyncServer::InitiateRequest() {
 	};
 	auto handle_CQE_AcceptHandle = [this,prep_RECV,handle_CQE_PrintMsg]
 		(StateMgmtIntf* instance,io_uring_cqe *cqe) mutable {
-		// std::cout << __FUNCTION__ <<" called handle_CQE_AcceptHandle"<< std::endl;
-		
-		// std::lock_guard<std::mutex> lock{mtx};
-		// we have to create a new instance for read operation on this new client fd
-		// client fd can be access using cqe->res
-		// auto _prep_RECV = [this](StateMgmtIntf* instance) {
-		// 	std::cout << __FUNCTION__ <<" called prep_RECV"<< std::endl;
-		// 	//std::lock_guard<std::mutex> lock(mtx);
-		// 	std::cout <<"> this : "<<this << std::endl;
-		// 	std::cout <<"> this ring : "<<this->ring_ << std::endl;
-		// 	auto sqe = io_uring_get_sqe(this->ring_);
-		// 	io_uring_prep_rw(IORING_OP_RECV, sqe,instance->getReadFd(), 
-		// 					instance->getBuffer(), READ_BUF_SIZE, 0);
-		// 	sqe->user_data = (__u64)(instance); // important
-		// 	auto ret = io_uring_submit(this->ring_);
-		// 	if (ret <= 0) {
-		// 		fprintf(stderr, "%s: sqe submit failed: %d\n", __FUNCTION__, ret);
-		// 	}
-		// };
-		// auto _handle_CQE_PrintMsg = [this](StateMgmtIntf* instance,io_uring_cqe *cqe) {
-		// 	std::cout << __FUNCTION__ <<" called handle_CQE_PrintMsg"<< std::endl;
-		// 	std::cout <<"Number of bytes read : " << cqe->res << std::endl;
-		// 	std::string x((char*)(instance->getBuffer()),cqe->res/*TODO replace with ??*/);
-		// 	std::cout <<"Client data : " << x << std::endl;
-		// 	return true;
-		// };		
-		
+		char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+        if (getnameinfo((const sockaddr*)instance->getClientSockAddr(), 
+						sizeof(sockaddr_in), hbuf, sizeof(hbuf), sbuf,
+                		sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
+			
+			instance->setClientAddr(std::string(hbuf,strlen(hbuf)));
+			instance->setClientPort(std::string(sbuf,strlen(sbuf)));
+		}
 		new StateMgmt<decltype(prep_RECV),decltype(handle_CQE_PrintMsg)>
 		(
 			this->ring_,
@@ -194,7 +180,8 @@ void AsyncServer::InitiateRequest() {
 			this,
 			prep_RECV, // reuse the prep_RECV function used in the UDP case
 			handle_CQE_PrintMsg, // reuse the handle function for UDP CQE case
-			true	// this is a TCP client fd read operation
+			true,	// this is a TCP client fd read operation
+			*(instance->getClientInfo())
 		);
 	};
 	new StateMgmt<decltype(prep_ACCEPT),decltype(handle_CQE_AcceptHandle)>

@@ -13,6 +13,7 @@
 #include <sys/un.h>
 #include <netinet/tcp.h>
 #include <netinet/in.h>
+#include <netdb.h>
 #include <liburing.h>
 
 using namespace std;
@@ -26,7 +27,14 @@ using namespace std;
 #define _SCTP_IDX		2
 
 #define READ_BUF_SIZE	1024
-using callBackFunction = void(*)(void*,int);
+struct client_info;
+using callBackFunction = void(*)(void*,int,client_info*);
+struct client_info {
+	client_info():ip(""),port(""){}
+	client_info(std::string _ip,std::string _port):ip(_ip),port(_port){}
+	std::string ip;
+	std::string port;
+};
 class AsyncServer {
 public:
 	AsyncServer();
@@ -40,6 +48,7 @@ public:
 	uint8_t server_type;
 	std::mutex mtx;
 	struct io_uring *ring_;
+	std::map<std::string,int> clientFdMap;
 protected:
 private:
 	void HandleRequest();
@@ -60,6 +69,10 @@ public:
 	virtual void* getBuffer() = 0;
 	virtual int getReadFd() = 0;
 	virtual int getAcceptFd() = 0;
+	virtual sockaddr_in* getClientSockAddr() = 0;
+	virtual void setClientAddr(std::string &&) = 0;
+	virtual void setClientPort(std::string &&) = 0;
+	virtual client_info* getClientInfo() = 0;
 };
 
 template< typename InitPrepFunc, typename HandlerFunc>
@@ -67,7 +80,7 @@ class StateMgmt : public StateMgmtIntf {
 public:
 	explicit StateMgmt(struct io_uring *ring,int read_fd,int accept_fd,
 			AsyncServer * _server, 
-			InitPrepFunc& initPrepFunc, HandlerFunc & handlerFunc,bool isClient = false)
+			InitPrepFunc& initPrepFunc, HandlerFunc & handlerFunc,bool isClient = false,client_info cli = client_info())
 		:ring_(ring),
 		sockfd_read(read_fd),
 		sockfd_accept(accept_fd),
@@ -75,7 +88,8 @@ public:
 		isClientFd(isClient),
 		m_server(_server),  
 		initPrepfunc_(initPrepFunc),
-		handlerfunc_(handlerFunc) {
+		handlerfunc_(handlerFunc),
+		client_(std::move(cli)) {
 		// std::cout <<"StateMgmt constructor called" << std::endl;
 		Proceed();
 	}
@@ -127,6 +141,10 @@ public:
 	}
 	int getReadFd() {return sockfd_read; }
 	int getAcceptFd() { return sockfd_accept; }
+	sockaddr_in* getClientSockAddr() { return &caddr;}
+	client_info* getClientInfo() {return &client_;};
+	void setClientAddr(std::string && x) {client_.ip = std::move(x);}
+	void setClientPort(std::string && x) {client_.port = std::move(x);}
 private:
 	struct io_uring *ring_;
 	int sockfd_read; 			// only one is needed
@@ -141,4 +159,6 @@ private:
 	char buf[READ_BUF_SIZE];
 	struct io_uring_sqe *sqe_;
 	int op_;
+	struct sockaddr_in caddr; 	// to get the client information
+	client_info client_;
 };

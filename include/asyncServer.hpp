@@ -26,13 +26,14 @@ using namespace std;
 #define _SCTP_IDX		2
 
 #define READ_BUF_SIZE	1024
-
+using callBackFunction = void(*)(void*,int);
 class AsyncServer {
 public:
 	AsyncServer();
 	~AsyncServer();
 	void Run();
 	void setServerConfig(uint8_t _types);
+	void registerHandler(callBackFunction handler);
 	int sockfd_udp = -1;
 	int sockfd_tcp = -1;
 	int sockfd_sctp = -1;

@@ -6,6 +6,8 @@
 
 #define HOST		"127.0.0.1"
 
+callBackFunction callback[5];
+
 AsyncServer::AsyncServer() {
 	std::cout << "AsyncServer instance Created" << std::endl;
 }
@@ -103,7 +105,9 @@ void AsyncServer::Run() {
     std::cout <<"Server socket created " << std::endl;
     HandleRequest();
 }
-
+void AsyncServer::registerHandler(callBackFunction handler) {
+	callback[0] = handler;
+}
 void AsyncServer::InitiateRequest() {
 	/******* prepare and define the handler functions for read operation ******/
 	auto prep_RECV = [this](StateMgmtIntf* instance) {
@@ -123,8 +127,9 @@ void AsyncServer::InitiateRequest() {
 	auto handle_CQE_PrintMsg = [this](StateMgmtIntf* instance,io_uring_cqe *cqe) {
 		//std::cout << __FUNCTION__ <<" called handle_CQE_PrintMsg"<< std::endl;
 		// std::cout <<"Number of bytes read : " << cqe->res << std::endl;
-		std::string x((char*)(instance->getBuffer()),cqe->res/*TODO replace with ??*/);
-		std::cout <<"Client data : " << x << std::endl;
+		// std::string x((char*)(instance->getBuffer()),cqe->res/*TODO replace with ??*/);
+		// std::cout <<"Client data : " << x << std::endl;
+		callback[0](instance->getBuffer(),cqe->res);
 		return true;
 	};
 	new StateMgmt<decltype(prep_RECV),decltype(handle_CQE_PrintMsg)>

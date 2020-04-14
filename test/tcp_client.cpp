@@ -36,6 +36,10 @@ int main() {
 	}
     auto n = send(sockfd,str,strlen(str),0);
     std::cout << n << " bytes sent to server" << std::endl;
-    close(sockfd);
+    char buffer[1024];
+	std::memset(buffer,sizeof(buffer),0);
+	read(sockfd, buffer, 1024);
+	std::cout <<"Received : "<< std::string(buffer,strlen(buffer) + 1) << std::endl;
+	close(sockfd);
     // getchar();
 }

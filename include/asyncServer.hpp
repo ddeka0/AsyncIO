@@ -97,6 +97,7 @@ public:
 		handlerfunc_(handlerFunc),
 		client_(std::move(cli)) {
 		// std::cout <<"StateMgmt constructor called" << std::endl;
+		std::memset(buf,sizeof(buf),0);
 		Proceed();
 	}
 	virtual ~StateMgmt() {

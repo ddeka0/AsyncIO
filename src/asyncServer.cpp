@@ -35,7 +35,7 @@ void AsyncServer::Send(void *buf,size_t len,client_info* client_) {
 		std::memcpy(dbuf,_buf,_len);
 		auto sqe = io_uring_get_sqe(this->ring_);
 		io_uring_prep_rw(IORING_OP_SEND, sqe,instance->getReadFd(), 
-						instance->getBuffer(), READ_BUF_SIZE, 0);
+						instance->getBuffer(), _len, 0);
 		sqe->user_data = (__u64)(instance); // important
 		auto ret = io_uring_submit(this->ring_);
 		if (ret <= 0) {
@@ -43,7 +43,7 @@ void AsyncServer::Send(void *buf,size_t len,client_info* client_) {
 		}
 	};
 	auto handle_CQE_AfterSend = [](StateMgmtIntf* instance,io_uring_cqe *cqe) {
-		std::cout <<"Data is sent to client" << std::endl;
+		std::cout <<"Data is sent to client. Bytes sent = "<<cqe->res << std::endl;
 	};
 
 	new StateMgmt<decltype(prep_SEND),decltype(handle_CQE_AfterSend)>

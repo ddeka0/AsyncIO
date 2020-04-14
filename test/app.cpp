@@ -7,7 +7,7 @@ int main() {
         std::string x((char*)(buf),len);
 		std::cout <<"Client data : " << x <<" and client info :"<<_client->ip +":"+ _client->port<< std::endl;
         char str[] = "Hello from Server!";
-        _server->Send(str,strlen(str),_client);
+        _server->Send(str,strlen(str) + 1,_client);
     };
     server.registerHandler(entryPoint);
 

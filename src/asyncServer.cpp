@@ -21,6 +21,42 @@ void AsyncServer::setServerConfig(uint8_t _types) {
 
 	this->server_type = _types;
 }
+
+void AsyncServer::Send(void *buf,size_t len,client_info* client_) {
+	std::string cKey = client_->to_string();
+	int fd = -1;
+	if(clientFdMap.find(cKey) != clientFdMap.end()) {
+		fd = clientFdMap[cKey];	
+	}else {
+		std::cerr <<"Client file descriptor not found" << std::endl;
+	}
+	auto prep_SEND = [this,_buf = buf,_len = len](StateMgmtIntf* instance) {
+		auto dbuf = instance->getBuffer();
+		std::memcpy(dbuf,_buf,_len);
+		auto sqe = io_uring_get_sqe(this->ring_);
+		io_uring_prep_rw(IORING_OP_SEND, sqe,instance->getReadFd(), 
+						instance->getBuffer(), READ_BUF_SIZE, 0);
+		sqe->user_data = (__u64)(instance); // important
+		auto ret = io_uring_submit(this->ring_);
+		if (ret <= 0) {
+			fprintf(stderr, "%s: sqe submit failed: %d\n", __FUNCTION__, ret);
+		}
+	};
+	auto handle_CQE_AfterSend = [](StateMgmtIntf* instance,io_uring_cqe *cqe) {
+		std::cout <<"Data is sent to client" << std::endl;
+	};
+
+	new StateMgmt<decltype(prep_SEND),decltype(handle_CQE_AfterSend)>
+	(
+        this->ring_,
+        fd, // this instance of StateMgmt is created for sending
+		-1, 
+        this,
+        prep_SEND,
+        handle_CQE_AfterSend,
+		true
+	);
+}
 // we need to call this Run() method from ecterna module
 void AsyncServer::Run() {
 	struct sockaddr_in saddr_tcp,saddr_udp,saddr_sctp;
@@ -109,7 +145,7 @@ void AsyncServer::registerHandler(callBackFunction handler) {
 	callback[0] = handler;
 }
 void AsyncServer::InitiateRequest() {
-	/******* prepare and define the handler functions for read operation ******/
+	/******* prepare and define the handler functions for read operation ******/	
 	auto prep_RECV = [this](StateMgmtIntf* instance) {
 		// std::cout << __FUNCTION__ <<" called prep_RECV"<< std::endl;
 		// std::lock_guard<std::mutex> lock(mtx);
@@ -124,13 +160,13 @@ void AsyncServer::InitiateRequest() {
 			fprintf(stderr, "%s: sqe submit failed: %d\n", __FUNCTION__, ret);
 		}
 	};
-	auto handle_CQE_PrintMsg = [](StateMgmtIntf* instance,io_uring_cqe *cqe) {
+	auto handle_CQE_PrintMsg = [this](StateMgmtIntf* instance,io_uring_cqe *cqe) {
 		//std::cout << __FUNCTION__ <<" called handle_CQE_PrintMsg"<< std::endl;
 		// std::cout <<"Number of bytes read : " << cqe->res << std::endl;
 		// std::string x((char*)(instance->getBuffer()),cqe->res/*TODO replace with ??*/);
 		// std::cout <<"Client data : " << x << std::endl;
 		if(callback[0] != nullptr) {
-			callback[0](instance->getBuffer(),cqe->res,instance->getClientInfo());
+			callback[0](this,instance->getBuffer(),cqe->res,instance->getClientInfo());
 		}
 		else 
 			std::cerr << "callback not registered" << std::endl;
@@ -172,6 +208,9 @@ void AsyncServer::InitiateRequest() {
 			instance->setClientAddr(std::string(hbuf,strlen(hbuf)));
 			instance->setClientPort(std::string(sbuf,strlen(sbuf)));
 		}
+		std::string key = instance->getClientInfo()->to_string();
+		clientFdMap[key] = cqe->res;
+		fdClientMap[cqe->res] = key;
 		new StateMgmt<decltype(prep_RECV),decltype(handle_CQE_PrintMsg)>
 		(
 			this->ring_,

@@ -28,10 +28,14 @@ using namespace std;
 
 #define READ_BUF_SIZE	1024
 struct client_info;
-using callBackFunction = void(*)(void*,int,client_info*);
+class AsyncServer;
+using callBackFunction = void(*)(AsyncServer*,void*,int,client_info*);
 struct client_info {
 	client_info():ip(""),port(""){}
 	client_info(std::string _ip,std::string _port):ip(_ip),port(_port){}
+	std::string to_string() {
+		return ip +":"+port;
+	}
 	std::string ip;
 	std::string port;
 };
@@ -49,6 +53,8 @@ public:
 	std::mutex mtx;
 	struct io_uring *ring_;
 	std::map<std::string,int> clientFdMap;
+	std::map<int,std::string> fdClientMap;
+	void Send(void *buf,size_t len,client_info* client_);
 protected:
 private:
 	void HandleRequest();

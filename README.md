@@ -66,3 +66,50 @@ If you dont want to use g++-10, you can change the compiler manually in the `CMa
 
 If you want to use gcc-10, then please check:
 https://github.com/ddeka0/cppLearn/tree/master/cpp20
+
+
+##### Future Targets:
+    
+Before discussing the feature of this io uring based cpp networking library, let us discuss some of the existing library for asychronous cpp library.
+
+###### libevent:
+
+The libevent API provides a mechanism to execute a callback function when a specific event occurs on a file descriptor or after a timeout has been reached.
+Furthermore, libevent also support callbacks due to signals or regular timeouts.
+
+###### evpp:
+1. Modern C++11 interface
+2. Modern functional/bind style callback instead of C-style function pointer.
+3. Multi-core friendly and thread-safe
+4. A nonblocking multi-threaded TCP server
+5. A nonblocking TCP client
+6. A nonblocking multi-threaded HTTP server based on the buildin http server of libevent
+7. A nonblocking HTTP client
+8. A nonblocking multi-threaded UDP server
+9. Async DNS resolving
+10. EventLoop/ThreadPool/Timer
+
+Therefore I pick the following features:
+
+1. Modern functional/bind style callback instead of C-style function pointer.
+2. Multi-core friendly and thread-safe
+3. A nonblocking multi-threaded TCP server
+3. A nonblocking multi-threaded UDP server
+4. A nonblocking TCP client
+5. A nonblocking UDP client
+6. Task system or thread pool
+7. .then() continuation
+8. timer support, callback on timer expire.
+
+##### Tutotial for programming with submission queue and completion queue:
+
+Please go through the pdf included in the repository if you have not gone through it.
+It explains the kernel API and liburing library APIs.
+
+Then you can check this blog: https://cor3ntin.github.io/posts/iouring/#io-uring
+
+Summary: For each non blocking task, programmer needs to do the following things:
+1. Prepare an SQE for X purpose and submit it in the Ring. (X could be read, write to socker, file write, timer etc)
+2. On completion of the X event, handle the event.
+    1. Before handling the event X, make sure to perform one more Prepare SQE + submit in the Ring for X.
+       If we want to handle more eventx like X. 

@@ -100,3 +100,16 @@ Therefore I pick the following features:
 6. Task system or thread pool
 7. .then() continuation
 8. timer support, callback on timer expire.
+
+##### Tutotial for programming with submission queue and completion queue:
+
+Please go through the pdf included in the repository if you have not gone through it.
+It explains the kernel API and liburing library APIs.
+
+Then you can check this blog: https://cor3ntin.github.io/posts/iouring/#io-uring
+
+Summary: For each non blocking task, programmer needs to do the following things:
+1. Prepare an SQE for X purpose and submit it in the Ring. (X could be read, write to socker, file write, timer etc)
+2. On completion of the X event, handle the event.
+    1. Before handling the event X, make sure to perform one more Prepare SQE + submit in the Ring for X.
+       If we want to handle more eventx like X. 

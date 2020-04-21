@@ -25,7 +25,14 @@ using namespace std;
 #define _UDP_IDX		0
 #define _TCP_IDX		1
 #define _SCTP_IDX		2
-
+enum _typeStateMgmt : uint8_t {
+	ACCEPT	= 0,
+	UDP_READ,
+	TCP_READ,
+	TCP_SEND,
+	UDP_SEND,
+	CLIENT_FD_CLOSE
+};
 #define READ_BUF_SIZE	1024
 struct client_info;
 class AsyncServer;
@@ -86,18 +93,21 @@ class StateMgmt : public StateMgmtIntf {
 public:
 	explicit StateMgmt(struct io_uring *ring,int read_fd,int accept_fd,
 			AsyncServer * _server, 
-			InitPrepFunc& initPrepFunc, HandlerFunc & handlerFunc,bool isClient = false,client_info cli = client_info())
+			InitPrepFunc& initPrepFunc, HandlerFunc & handlerFunc,uint8_t _typ,
+			bool _isSend = false,client_info cli = client_info())
 		:ring_(ring),
 		sockfd_read(read_fd),
 		sockfd_accept(accept_fd),
 		status_(CREATE),
-		isClientFd(isClient),
-		m_server(_server),  
+		isSend(_isSend),
+		m_server(_server),
 		initPrepfunc_(initPrepFunc),
 		handlerfunc_(handlerFunc),
-		client_(std::move(cli)) {
+		client_(std::move(cli)),
+		_ts((_typeStateMgmt)_typ) {
 		// std::cout <<"StateMgmt constructor called" << std::endl;
 		std::memset(buf,sizeof(buf),0);
+		std::cout <<"Created " << (void*)(this) <<" of type "<<(int)_ts<< std::endl;
 		Proceed();
 	}
 	virtual ~StateMgmt() {
@@ -112,7 +122,7 @@ public:
 			break;
 			case PROCESS: {
 				// Createa a new instance before current instance goes away
-				if(!isClientFd)
+				if(!isSend && cqe->res != 0)
 				new StateMgmt<InitPrepFunc,HandlerFunc>
 				(
 					ring_,
@@ -121,10 +131,10 @@ public:
 					m_server,
 					initPrepfunc_,
 					handlerfunc_,
-					isClientFd?true:false
+					_ts
 				);
-				
-				handlerfunc_(this,cqe);
+				if(cqe->res != 0)
+					handlerfunc_(this,cqe);
 
 				status_ = FINISH;
 				
@@ -134,8 +144,14 @@ public:
 			break;
 			case FINISH: {
 				assert(status_ == FINISH);
-				if(isClientFd)
+				if(cqe->res == 0) {
+					auto key = m_server->fdClientMap[this->sockfd_read];
+					m_server->clientFdMap.erase(m_server->clientFdMap.find(key));
+					m_server->fdClientMap.erase(m_server->fdClientMap.find(this->sockfd_read));
 					close(this->sockfd_read);
+					std::cout <<"file descriptor,closing it!" << std::endl;
+				}
+				std::cout <<"Deleted " << (void*)(this)<<" of type "<<(int)_ts<< std::endl;
 				delete this;
 			}
 			break;
@@ -158,10 +174,11 @@ private:
 	int sockfd_accept; 			// only one is needed
 	enum CallStatus { CREATE, PROCESS, FINISH };
 	CallStatus status_;
-	bool isClientFd = false;
+	bool isSend = false;
 	AsyncServer * m_server;
 	InitPrepFunc initPrepfunc_;
 	HandlerFunc handlerfunc_;
+	_typeStateMgmt _ts;
 
 	char buf[READ_BUF_SIZE];
 	struct io_uring_sqe *sqe_;

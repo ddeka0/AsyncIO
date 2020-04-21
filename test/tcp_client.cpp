@@ -28,7 +28,7 @@ int main() {
 		return 1;
 	}
     
-    char str[] = "Hello IO_URING(TCP)";
+    char str[] = "a";
     ret = connect(sockfd, (const sockaddr*)&saddr, sizeof(saddr));
 	if (ret < 0) {
 		perror("connect");
@@ -41,5 +41,5 @@ int main() {
 	read(sockfd, buffer, 1024);
 	std::cout <<"Received : "<< std::string(buffer,strlen(buffer) + 1) << std::endl;
 	close(sockfd);
-    // getchar();
+    getchar();
 }

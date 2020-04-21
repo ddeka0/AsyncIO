@@ -29,6 +29,7 @@ void AsyncServer::Send(void *buf,size_t len,client_info* client_) {
 		fd = clientFdMap[cKey];	
 	}else {
 		std::cerr <<"Client file descriptor not found" << std::endl;
+		return;
 	}
 	auto prep_SEND = [this,_buf = buf,_len = len](StateMgmtIntf* instance) {
 		auto dbuf = instance->getBuffer();
@@ -45,7 +46,7 @@ void AsyncServer::Send(void *buf,size_t len,client_info* client_) {
 	auto handle_CQE_AfterSend = [](StateMgmtIntf* instance,io_uring_cqe *cqe) {
 		std::cout <<"Data is sent to client. Bytes sent = "<<cqe->res << std::endl;
 	};
-
+	std::cout <<"Send prep done!" << std::endl;
 	new StateMgmt<decltype(prep_SEND),decltype(handle_CQE_AfterSend)>
 	(
         this->ring_,
@@ -54,7 +55,8 @@ void AsyncServer::Send(void *buf,size_t len,client_info* client_) {
         this,
         prep_SEND,
         handle_CQE_AfterSend,
-		true
+		TCP_SEND,
+		true // isSend = true
 	);
 }
 // we need to call this Run() method from ecterna module
@@ -146,6 +148,8 @@ void AsyncServer::registerHandler(callBackFunction handler) {
 }
 void AsyncServer::InitiateRequest() {
 	/******* prepare and define the handler functions for read operation ******/	
+
+	////////////////////////////////////////////////////////////////////////////
 	auto prep_RECV = [this](StateMgmtIntf* instance) {
 		// std::cout << __FUNCTION__ <<" called prep_RECV"<< std::endl;
 		// std::lock_guard<std::mutex> lock(mtx);
@@ -179,7 +183,8 @@ void AsyncServer::InitiateRequest() {
 		-1, 
         this,
         prep_RECV,
-        handle_CQE_PrintMsg
+        handle_CQE_PrintMsg,
+		TCP_READ
 	);
 	/**************************************************************************/
 
@@ -219,9 +224,42 @@ void AsyncServer::InitiateRequest() {
 			this,
 			prep_RECV, // reuse the prep_RECV function used in the UDP case
 			handle_CQE_PrintMsg, // reuse the handle function for UDP CQE case
-			true,	// this is a TCP client fd read operation
+			TCP_READ,
+			false,	// this is a TCP client fd read operation
 			*(instance->getClientInfo())
 		);
+
+		// for closing of client sockfd by client itself
+
+		// auto prep_CLOSE = [this](StateMgmtIntf* instance) {
+		// 	// std::cout << __FUNCTION__ <<" called prep_RECV"<< std::endl;
+		// 	// std::lock_guard<std::mutex> lock(mtx);
+		// 	// std::cout <<"> this : "<<this << std::endl;
+		// 	// std::cout <<"> this ring : "<<this->ring_ << std::endl;
+		// 	auto sqe = io_uring_get_sqe(this->ring_);
+		// 	io_uring_prep_rw(IORING_OP_CLOSE, sqe, instance->getReadFd(), NULL, 0, 0);
+		// 	sqe->user_data = (__u64)(instance); // important
+		// 	auto ret = io_uring_submit(this->ring_);
+		// 	if (ret <= 0) {
+		// 		fprintf(stderr, "%s: sqe submit failed: %d\n", __FUNCTION__, ret);
+		// 	}
+		// };
+
+		// auto handle_CQE_CLOSE = [](StateMgmtIntf* instance,io_uring_cqe *cqe) {
+		// 	std::cout <<"Client has closed the connection" << std::endl;
+		// 	close(instance->getReadFd());
+		// };
+
+		// new StateMgmt<decltype(prep_CLOSE),decltype(handle_CQE_CLOSE)>
+		// (
+		// 	this->ring_,
+		// 	cqe->res, // this instance of StateMgmt is created for UDP server read
+		// 	-1, 
+		// 	this,
+		// 	prep_CLOSE,
+		// 	handle_CQE_CLOSE,
+		// 	CLIENT_FD_CLOSE
+		// );
 	};
 	new StateMgmt<decltype(prep_ACCEPT),decltype(handle_CQE_AcceptHandle)>
 	(
@@ -230,7 +268,8 @@ void AsyncServer::InitiateRequest() {
         this->sockfd_tcp,
 		this,
         prep_ACCEPT,
-        handle_CQE_AcceptHandle
+        handle_CQE_AcceptHandle,
+		ACCEPT
 	);
 	/**************************************************************************/
 }
@@ -242,6 +281,7 @@ void AsyncServer::HandleRequest() {
 		// Do I need to use lock here ?
 		struct io_uring_cqe *cqe;
 		io_uring_wait_cqe(ring_, &cqe);
+		std::cout <<"cqe->res " << cqe->res <<"cqe->flags "<<cqe->flags <<" errno "<< errno << std::endl;
 		if (cqe->res == -EINVAL) {
 			fprintf(stdout, "recv not supported, skipping\n");
 		}

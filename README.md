@@ -37,9 +37,49 @@ After cloning this repository, please create a dummy file to run the sample test
     
 #### TODO for socket server features:
     Currently Socket server only supports UDP socket server
-    1. Add TCP,SCTP support
-    2. Add timer support
+    1. Add TCP,SCTP support // partially done
+    2. Add timer support // partially done
     3. Add a task system to parallelize the processing of the client requests.
+
+#### Examples:
+
+##### Socket Server App:
+```
+int main() {
+    AsyncServer server;
+    server.setServerConfig(SOCK_TCP | SOCK_UDP);
+    
+    auto entryPoint = [](AsyncServer *_server,void* buf,int len,client_info* _client) {
+        std::string x((char*)(buf),len);
+		std::cout <<"Client data : " << x <<" and client info :"
+            <<_client->ip +":"+ _client->port<< std::endl;
+        char str[] = "Hello from Server!";
+        _server->Send(str,strlen(str) + 1,_client);
+    };
+    
+    server.registerHandler(entryPoint);
+
+    server.Run();
+}
+```
+
+##### Timer App:
+
+```
+int main() {
+    AsyncServer server;
+    auto t100 = server.createNewTimer("T100",2);
+    t100->repeatIndHandler = []() {
+        std::cout <<"Retry again inside repeatInd handler" << std::endl;
+    };
+    t100->expiryIndHandler =[]() {
+        std::cout <<"t100 has expired" << std::endl;
+    };
+    t100->setRepeatCount(3);
+    server.startTimer(t100);
+    server.Run();
+}
+```
 
 #### For few Test cases, your linux kernel might need to be updated.
     Follow the steps to update your kernel (replace kernel version with latest once)

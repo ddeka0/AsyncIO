@@ -32,7 +32,8 @@ enum _typeStateMgmt : uint8_t {
 	TCP_READ,
 	TCP_SEND,
 	UDP_SEND,
-	CLIENT_FD_CLOSE
+	CLIENT_FD_CLOSE,
+	TIMEOUT
 };
 enum _clientType : uint8_t {
 	TCP_CLIENT = 0,
@@ -53,6 +54,23 @@ struct client_info {
 	std::string port;
 	_clientType ctype;
 };
+
+struct timerInfo {
+	timerInfo(std::string _tname,int _duration): 
+		tname(_tname),duration(_duration) {}
+	std::string tname = "";
+	int duration = -1; // duration in seconds
+	int repeatCount = -1;
+	int remainCount = -1;
+	bool isStopped = false;
+	bool isExpired = false;
+	void (*repeatIndHandler)() = nullptr;
+	void (*expiryIndHandler)() = nullptr;
+	void setRepeatCount(int n) {
+		repeatCount = n;
+		remainCount = n - 1;
+	}
+};
 class AsyncServer {
 public:
 	AsyncServer();
@@ -69,6 +87,10 @@ public:
 	std::map<std::string,int> clientFdMap;
 	std::map<int,std::string> fdClientMap;
 	void Send(void *buf,size_t len,client_info* client_);
+	timerInfo* createNewTimer(std::string tname,int duration);
+	void startTimer(timerInfo*);
+	void stopTimer(timerInfo*);
+	bool isSocketServer = false;
 protected:
 private:
 	void HandleRequest();
@@ -93,6 +115,7 @@ public:
 	virtual void setClientAddr(std::string &&) = 0;
 	virtual void setClientPort(std::string &&) = 0;
 	virtual client_info* getClientInfo() = 0;
+	virtual timerInfo* getTimerInfo() = 0;
 };
 
 template< typename InitPrepFunc, typename HandlerFunc>
@@ -101,7 +124,7 @@ public:
 	explicit StateMgmt(struct io_uring *ring,int read_fd,int accept_fd,
 			AsyncServer * _server, 
 			InitPrepFunc& initPrepFunc, HandlerFunc & handlerFunc,uint8_t _typ,
-			bool _isSend = false,client_info cli = client_info())
+			bool _isSend = false,client_info cli = client_info(),timerInfo* _timer = nullptr)
 		:ring_(ring),
 		sockfd_read(read_fd),
 		sockfd_accept(accept_fd),
@@ -111,10 +134,11 @@ public:
 		initPrepfunc_(initPrepFunc),
 		handlerfunc_(handlerFunc),
 		client_(std::move(cli)),
-		_ts((_typeStateMgmt)_typ) {
+		_ts((_typeStateMgmt)_typ),
+		_timerInfo(_timer) {
 		// std::cout <<"StateMgmt constructor called" << std::endl;
 		std::memset(buf,sizeof(buf),0);
-		std::cout <<"Created " << (void*)(this) <<" of type "<<(int)_ts<< std::endl;
+		//std::cout <<"Created " << (void*)(this) <<" of type "<<(int)_ts<< std::endl;
 		Proceed();
 	}
 	virtual ~StateMgmt() {
@@ -129,7 +153,7 @@ public:
 			break;
 			case PROCESS: {
 				// Createa a new instance before current instance goes away
-				if(!isSend && cqe->res != 0)
+				if(!isSend && cqe->res != 0 && _ts != TIMEOUT)
 				new StateMgmt<InitPrepFunc,HandlerFunc>
 				(
 					ring_,
@@ -142,6 +166,25 @@ public:
 				);
 				if(cqe->res != 0)
 					handlerfunc_(this,cqe);
+
+				if(_ts == TIMEOUT && _timerInfo->remainCount >= 0 
+					&& _timerInfo->isStopped == false 
+					&& _timerInfo->isExpired == false) {
+					assert(_timerInfo != nullptr);
+					new StateMgmt<InitPrepFunc,HandlerFunc>
+					(
+						ring_,
+						sockfd_read,
+						sockfd_accept,
+						m_server,
+						initPrepfunc_,
+						handlerfunc_,
+						_ts,
+						isSend,
+						client_,
+						_timerInfo // this pointer wull be valid
+					);
+				}
 
 				status_ = FINISH;
 				
@@ -158,7 +201,7 @@ public:
 					close(this->sockfd_read);
 					std::cout <<"file descriptor,closing it!" << std::endl;
 				}
-				std::cout <<"Deleted " << (void*)(this)<<" of type "<<(int)_ts<< std::endl;
+				// std::cout <<"Deleted " << (void*)(this)<<" of type "<<(int)_ts<< std::endl;
 				delete this;
 			}
 			break;
@@ -175,6 +218,7 @@ public:
 	client_info* getClientInfo() {return &client_;};
 	void setClientAddr(std::string && x) {client_.ip = std::move(x);}
 	void setClientPort(std::string && x) {client_.port = std::move(x);}
+	timerInfo* getTimerInfo() {return _timerInfo;}
 private:
 	struct io_uring *ring_;
 	int sockfd_read; 			// only one is needed
@@ -185,11 +229,12 @@ private:
 	AsyncServer * m_server;
 	InitPrepFunc initPrepfunc_;
 	HandlerFunc handlerfunc_;
+	client_info client_;
 	_typeStateMgmt _ts;
+	timerInfo* _timerInfo;
 
 	char buf[READ_BUF_SIZE];
 	struct io_uring_sqe *sqe_;
 	int op_;
 	struct sockaddr_in caddr; 	// to get the client information
-	client_info client_;
 };

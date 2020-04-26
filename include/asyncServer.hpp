@@ -25,6 +25,7 @@ using namespace std;
 #define _UDP_IDX		0
 #define _TCP_IDX		1
 #define _SCTP_IDX		2
+
 enum _typeStateMgmt : uint8_t {
 	ACCEPT	= 0,
 	UDP_READ,
@@ -32,6 +33,11 @@ enum _typeStateMgmt : uint8_t {
 	TCP_SEND,
 	UDP_SEND,
 	CLIENT_FD_CLOSE
+};
+enum _clientType : uint8_t {
+	TCP_CLIENT = 0,
+	UDP_CLIENT,
+	SCTP_CLIENT,
 };
 #define READ_BUF_SIZE	1024
 struct client_info;
@@ -45,6 +51,7 @@ struct client_info {
 	}
 	std::string ip;
 	std::string port;
+	_clientType ctype;
 };
 class AsyncServer {
 public:

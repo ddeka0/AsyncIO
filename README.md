@@ -80,6 +80,7 @@ int main() {
     server.Run();
 }
 ```
+![TimerApp Demo](https://github.com/ddeka0/io_uring_cpp/blob/master/timerApp-demo.gif)
 
 #### For few Test cases, your linux kernel might need to be updated.
     Follow the steps to update your kernel (replace kernel version with latest once)

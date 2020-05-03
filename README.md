@@ -1,4 +1,4 @@
-# io_uring_cpp
+# AsyncIO
 A CPP wrapper for a asychronous socket server. This code uses Jens Axboe's library "liburing".
 Please check this talk at https://www.youtube.com/watch?v=-5T4Cjw46ys
 

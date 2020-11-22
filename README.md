@@ -2,6 +2,8 @@
 A CPP wrapper for a asychronous socket server. This code uses Jens Axboe's library "liburing".
 Please check this talk at https://www.youtube.com/watch?v=-5T4Cjw46ys
 
+#### This project is under development.
+
 ### IO Uring Diagram (image source : https://cor3ntin.github.io/posts/iouring/)
 ![io_uring](https://cor3ntin.github.io/posts/iouring/uring.svg)
 

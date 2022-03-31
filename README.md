@@ -158,3 +158,7 @@ Summary: For each non blocking task, programmer needs to do the following things
 2. On completion of the X event, handle the event.
     1. Before handling the event X, make sure to perform one more Prepare SQE + submit in the Ring for X.
        If we want to handle more eventx like X. 
+
+
+A good talk https://www.youtube.com/watch?v=uPJFj3b8RN0 
+This talk combines uring & coroutine.
